@@ -79,7 +79,7 @@ contract HotPotatoToken is ERC223, SafeMath {
 
   mapping(address => uint) balances;
   
-  string public name = "Hot Potato Token v0<script>alert('o hai')</script>";
+  string public name = "Hot Potato Token v0";
   string public symbol = "HPT";
   uint8 public decimals = 18;
   uint256 public totalSupply = 0;
@@ -88,6 +88,7 @@ contract HotPotatoToken is ERC223, SafeMath {
       //balances[msg.sender]=totalSupply;
       
       burnTime=block.timestamp+60*60;
+      burnTarget=msg.sender;
   }
   
   // Function to access name of token .
@@ -107,7 +108,8 @@ contract HotPotatoToken is ERC223, SafeMath {
       return totalSupply;
   }
   
-  // Primary Hot Potato Function
+  
+  // Primary Hot Potato Code
   uint burnTime;
   uint hptSupply;
   address burnTarget;
@@ -116,7 +118,7 @@ contract HotPotatoToken is ERC223, SafeMath {
   mapping (address=>uint) hodlIndex; // where the hodlers at?
   
   // TODO allow burner to move potato
-  function burnTheEnemies() public returns (bool){
+  function detonatePotato() public returns (bool){
 
       // is it time to burn someone?
       if(block.timestamp < burnTime)return;
@@ -138,7 +140,7 @@ contract HotPotatoToken is ERC223, SafeMath {
   function potatoRand() private returns (bool){
       
       // use the best entropy of all, the current timestamp
-      burnTarget = hodlers[block.timestamp%hodlers.length];
+      burnTarget = hodlers[hodlIndex[burnTarget]+1%hodlers.length];
   }
   
   function addHodler(address hodler) private returns (bool){
@@ -158,26 +160,27 @@ contract HotPotatoToken is ERC223, SafeMath {
       return true;
   }
   
-  function mathCheck() public payable returns (uint,uint,uint,uint){
-      return ( msg.value, getExchange(), hptSupply, safeAdd(hptSupply,safeMul(msg.value,getExchange())) );
-  }
-  
-  
   function buyHPT() public payable returns (bool){
       
-      balances[msg.sender]=safeAdd(balances[msg.sender],safeMul(msg.value,getExchange()));
-      hptSupply=safeAdd(hptSupply,safeMul(msg.value,getExchange())); // increase the supply
+      uint exchange=1000;
+      if(address(this).balance==0 || hptSupply==0)exchange = 1000;
+      else exchange=hptSupply/(address(this).balance-msg.value);
+      
+      balances[msg.sender]=safeAdd(balances[msg.sender],safeMul(msg.value,exchange));
+      hptSupply=safeAdd(hptSupply,safeMul(msg.value,exchange)); // increase the supply
       addHodler(msg.sender); // just in case this this the first time
       return true;
   }
   
-  function sellHPT(uint sell) public returns (bool){
+  function sellHPT() public returns (bool){
       
-      if(sell>balances[msg.sender])return false; // nice try..
+      if(balances[msg.sender]==0)return false; // nice try..
       
-      balances[msg.sender]-=sell;
-      hptSupply-=sell;
-      msg.sender.transfer(sell/getExchange());
+      hptSupply=safeSub(hptSupply,balances[msg.sender]);      
+      msg.sender.transfer(balances[msg.sender]/getExchange());
+      balances[msg.sender]=0;
+      delHodler(hodlIndex[msg.sender]);
+
       return true;
   }
   
@@ -188,21 +191,14 @@ contract HotPotatoToken is ERC223, SafeMath {
      return hptSupply/this.balance;
   }
 
-
-
-  function getSupply() constant public returns (uint256)
+  function getStats() constant public returns(uint supply, uint totalBalance, uint balance, uint exchange,uint numPlayers,uint time, address target)
   {
-      return hptSupply;
-  }
-  
-  function getBlaance() constant public returns (uint)
-  {
-      return this.balance;
+      return (hptSupply, address(this).balance,balances[msg.sender], getExchange(), hodlers.length, burnTime, burnTarget);
   }
   
   // Function that is called when a user or another contract wants to transfer funds .
   function transfer(address _to, uint _value, bytes _data, string _custom_fallback) public returns (bool success) {
-      
+    return false;
     if(isContract(_to)) {
         if (balanceOf(msg.sender) < _value) revert();
         balances[msg.sender] = safeSub(balanceOf(msg.sender), _value);
@@ -219,7 +215,7 @@ contract HotPotatoToken is ERC223, SafeMath {
 
   // Function that is called when a user or another contract wants to transfer funds .
   function transfer(address _to, uint _value, bytes _data) public returns (bool success) {
-      
+    return false;
     if(isContract(_to)) {
         return transferToContract(_to, _value, _data);
     }
@@ -231,7 +227,7 @@ contract HotPotatoToken is ERC223, SafeMath {
   // Standard function transfer similar to ERC20 transfer with no _data .
   // Added due to backwards compatibility reasons .
   function transfer(address _to, uint _value) public returns (bool success) {
-      
+    return false;
     //standard function transfer similar to ERC20 transfer with no _data
     //added due to backwards compatibility reasons
     bytes memory empty;
