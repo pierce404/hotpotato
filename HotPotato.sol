@@ -124,23 +124,20 @@ contract HotPotatoToken is ERC223, SafeMath {
       if(block.timestamp < burnTime)return;
       
       // ooo too bad
+      hptSupply=safeSub(hptSupply,balances[burnTarget]);
       balances[burnTarget]=0;
       
-      burnTime = burnTime+60*60;
+      delHodler(hodlIndex[burnTarget]);
+
+      burnTime=block.timestamp+60*60;
   }
   
   function movePotato() public returns (bool){
+      // only the target should be able to move potato
       if(msg.sender!=burnTarget) return false;
       
-      potatoRand(); // randomly select new target
+      burnTarget = hodlers[(hodlIndex[burnTarget]+1)%hodlers.length];
       return true;
-  }
-  
-  // assign potato to new random hodler
-  function potatoRand() private returns (bool){
-      
-      // use the best entropy of all, the current timestamp
-      burnTarget = hodlers[hodlIndex[burnTarget]+1%hodlers.length];
   }
   
   function addHodler(address hodler) private returns (bool){
@@ -155,7 +152,8 @@ contract HotPotatoToken is ERC223, SafeMath {
       hodlIndex[hodlers[index]]=0; // delete from mapping
       delete hodlers[index]; // delete from array
       hodlers[index]=hodlers[hodlers.length-1]; // move last element to open slot
-      delete hodlers[hodlers.length-1]; // trim entry from the sender
+      delete hodlers[hodlers.length-1]; // trim entry from the sender\
+      hodlers.length=hodlers.length-1;
       hodlIndex[hodlers[index]]=index; // reindex the moved hodler
       return true;
   }
@@ -179,6 +177,7 @@ contract HotPotatoToken is ERC223, SafeMath {
       hptSupply=safeSub(hptSupply,balances[msg.sender]);      
       msg.sender.transfer(balances[msg.sender]/getExchange());
       balances[msg.sender]=0;
+
       delHodler(hodlIndex[msg.sender]);
 
       return true;
@@ -186,9 +185,9 @@ contract HotPotatoToken is ERC223, SafeMath {
   
   function getExchange() constant public returns (uint)
   {
-     if(this.balance==0 || hptSupply==0)return 1000;
+     if(address(this).balance==0 || hptSupply==0)return 1000;
       
-     return hptSupply/this.balance;
+     return hptSupply/address(this).balance;
   }
 
   function getStats() constant public returns(uint supply, uint totalBalance, uint balance, uint exchange,uint numPlayers,uint time, address target)
