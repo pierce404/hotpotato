@@ -1,4 +1,4 @@
-pragma solidity ^0.4.9;
+pragma solidity ^0.5.11;
 
 //import "./Receiver_Interface.sol";
  contract ContractReceiver {
@@ -11,22 +11,6 @@ pragma solidity ^0.4.9;
     }
     
     
-    function tokenFallback(address _from, uint _value, bytes _data) public pure {
-      TKN memory tkn;
-      tkn.sender = _from;
-      tkn.value = _value;
-      tkn.data = _data;
-      uint32 u = uint32(_data[3]) + (uint32(_data[2]) << 8) + (uint32(_data[1]) << 16) + (uint32(_data[0]) << 24);
-      tkn.sig = bytes4(u);
-      
-      /* tkn variable is analogue of msg variable of Ether transaction
-      *  tkn.sender is person who initiated this token transaction   (analogue of msg.sender)
-      *  tkn.value the number of tokens that were sent   (analogue of msg.value)
-      *  tkn.data is data of token transaction   (analogue of msg.data)
-      *  tkn.sig is 4 bytes signature of function
-      *  if data of token transaction is a function execution
-      */
-    }
 }
 
 //import "./ERC223_Interface.sol";
@@ -34,14 +18,9 @@ contract ERC223 {
   uint public totalSupply;
   function balanceOf(address who) public view returns (uint);
   
-  function name() public view returns (string _name);
-  function symbol() public view returns (string _symbol);
-  function decimals() public view returns (uint8 _decimals);
-  function totalSupply() public view returns (uint256 _supply);
-
   function transfer(address to, uint value) public returns (bool ok);
-  function transfer(address to, uint value, bytes data) public returns (bool ok);
-  function transfer(address to, uint value, bytes data, string custom_fallback) public returns (bool ok);
+  function transfer(address to, uint value, bytes memory data) public returns (bool ok);
+  function transfer(address to, uint value, bytes memory data, string memory custom_fallback) public returns (bool ok);
   
   event Transfer(address indexed from, address indexed to, uint value, bytes indexed data);
 }
@@ -84,29 +63,13 @@ contract HotPotatoToken is ERC223, SafeMath {
   uint8 public decimals = 18;
   uint256 public totalSupply = 0;
   
-  function HotPotatoToken() public {
+  constructor() public {
       //balances[msg.sender]=totalSupply;
       
       burnTime=block.timestamp+60*60;
       burnTarget=msg.sender;
   }
   
-  // Function to access name of token .
-  function name() public view returns (string _name) {
-      return name;
-  }
-  // Function to access symbol of token .
-  function symbol() public view returns (string _symbol) {
-      return symbol;
-  }
-  // Function to access decimals of token .
-  function decimals() public view returns (uint8 _decimals) {
-      return decimals;
-  }
-  // Function to access total supply of tokens .
-  function totalSupply() public view returns (uint256 _totalSupply) {
-      return totalSupply;
-  }
   
   
   // Primary Hot Potato Code
@@ -121,7 +84,7 @@ contract HotPotatoToken is ERC223, SafeMath {
   function detonatePotato() public returns (bool){
 
       // is it time to burn someone?
-      if(block.timestamp < burnTime)return;
+      if(block.timestamp < burnTime)return false;
       
       // ooo too bad
       hptSupply=safeSub(hptSupply,balances[burnTarget]);
@@ -183,27 +146,27 @@ contract HotPotatoToken is ERC223, SafeMath {
       return true;
   }
   
-  function getExchange() constant public returns (uint)
+  function getExchange() public returns (uint)
   {
      if(address(this).balance==0 || hptSupply==0)return 1000;
       
      return hptSupply/address(this).balance;
   }
 
-  function getStats() constant public returns(uint supply, uint totalBalance, uint balance, uint exchange,uint numPlayers,uint time, address target)
+  function getStats() public returns(uint supply, uint totalBalance, uint balance, uint exchange,uint numPlayers,uint time, address target)
   {
       return (hptSupply, address(this).balance,balances[msg.sender], getExchange(), hodlers.length, burnTime, burnTarget);
   }
   
   // Function that is called when a user or another contract wants to transfer funds .
-  function transfer(address _to, uint _value, bytes _data, string _custom_fallback) public returns (bool success) {
+  function transfer(address _to, uint _value, bytes memory _data, string memory _custom_fallback) public returns (bool success) {
     return false;
     if(isContract(_to)) {
         if (balanceOf(msg.sender) < _value) revert();
         balances[msg.sender] = safeSub(balanceOf(msg.sender), _value);
         balances[_to] = safeAdd(balanceOf(_to), _value);
-        assert(_to.call.value(0)(bytes4(keccak256(_custom_fallback)), msg.sender, _value, _data));
-        Transfer(msg.sender, _to, _value, _data);
+        //assert(_to.call.value(0)(bytes4(keccak256(_custom_fallback)), msg.sender, _value, _data));
+        emit Transfer(msg.sender, _to, _value, _data);
         return true;
     }
     else {
@@ -213,7 +176,7 @@ contract HotPotatoToken is ERC223, SafeMath {
   
 
   // Function that is called when a user or another contract wants to transfer funds .
-  function transfer(address _to, uint _value, bytes _data) public returns (bool success) {
+  function transfer(address _to, uint _value, bytes memory _data) public returns (bool success) {
     return false;
     if(isContract(_to)) {
         return transferToContract(_to, _value, _data);
@@ -249,22 +212,22 @@ contract HotPotatoToken is ERC223, SafeMath {
     }
 
   //function that is called when transaction target is an address
-  function transferToAddress(address _to, uint _value, bytes _data) private returns (bool success) {
+  function transferToAddress(address _to, uint _value, bytes memory _data) private returns (bool success) {
     if (balanceOf(msg.sender) < _value) revert();
     balances[msg.sender] = safeSub(balanceOf(msg.sender), _value);
     balances[_to] = safeAdd(balanceOf(_to), _value);
-    Transfer(msg.sender, _to, _value, _data);
+    emit Transfer(msg.sender, _to, _value, _data);
     return true;
   }
   
   //function that is called when transaction target is a contract
-  function transferToContract(address _to, uint _value, bytes _data) private returns (bool success) {
+  function transferToContract(address _to, uint _value, bytes memory _data) private returns (bool success) {
     if (balanceOf(msg.sender) < _value) revert();
     balances[msg.sender] = safeSub(balanceOf(msg.sender), _value);
     balances[_to] = safeAdd(balanceOf(_to), _value);
     ContractReceiver receiver = ContractReceiver(_to);
-    receiver.tokenFallback(msg.sender, _value, _data);
-    Transfer(msg.sender, _to, _value, _data);
+    //receiver.tokenFallback(msg.sender, _value, _data);
+    emit Transfer(msg.sender, _to, _value, _data);
     return true;
 }
 
