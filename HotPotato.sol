@@ -133,6 +133,12 @@ contract HotPotatoToken is ERC223, SafeMath {
       return true;
   }
   
+  function crytic_hello(uint256 something) public returns (bool)
+  {
+    if( something > 43)return false;
+    return true;
+  }
+  
   function sellHPT() public returns (bool){
       
       if(balances[msg.sender]==0)return false; // nice try..
